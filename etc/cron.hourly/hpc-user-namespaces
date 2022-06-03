@@ -1,0 +1,70 @@
+#! /bin/bash
+
+# user namespaces are required for unpriviledged users who would like to 
+# create or modify containers which requires them to "be root" inside a 
+# container when using apptainer (singularity), podman or LXC for example
+# on HPC nodes. 
+# As an unpriviledged user per definition cannot be root or have sudo on the 
+# host (outside the container) user namespaces simply map uid 0 (root) inside
+# the container to a higher uid on the host using the config files /etc/subuid 
+# and /etc/subgid. They also add an alloted range of 65536 UIDs required by 
+# any unix system to function properly. See this article for more details: 
+# https://opensource.com/article/19/2/how-does-rootless-podman-work
+# This script creates and maintains /etc/subuid and /etc/subgid for container 
+# name spaces.
+# Note that we simply multiply each users' uid with 10000 to create the uid
+# of the root user inside the container. This will inevitably create 
+# overlapping uid ranges if 2 users were to use the same host. This is not a 
+# problem however as applications rarely require the use of uids > 1000.
+#   
+# If you are using SSSD to integrate with ActiveDirectory you need to set 
+# enumerate=true in section [domain/<domainname>] of your /etc/sssd/sssd.conf.
+# Note that the SSSD documentation warns you against activating enumeration as
+# is can degrade performance. We asked our ActiveDirectory team to monitor 
+# impact on the domain controllers and they did not see any performance 
+# degragation. This test was run on 100 servers with 500 users.
+# To protect against potential future performance degragation we chose to add 2
+# more features: (1) a random delay of up to 5 min in this script which causes
+# each node to execute this script at a slightly different time and the 
+# hpc-config-shuffler script in etc/cron.daily. This script changes the order 
+# of a list of ldap servers to prevent that all nodes contact the same ldap 
+# server first. If you use tools such as Puppet/Chef/Ansible/Salt you may find
+# more elegant ways to implement such a shuffle. 
+# If you are still concerned about too many servers executing this script you
+# could simply execute this script on a couple of machines and then copy 
+# /etc/subuid and /etc/subgid them to all your other nodes.
+# 
+
+getid(){
+  bigid=$(($1*10000))
+  if [[ ${bigid} -gt 4294967296 ]]; then
+    logger "${bigid} (${myuser}) is larger than the 32bit UID range..ignoring"
+    bigid='' 
+  fi
+}
+
+rm -f /etc/subuid.tmp
+rm -f /etc/subgid.tmp
+
+sleep $((RANDOM % 300))     # delay execution between 1 and 300 sec (5 min)
+getent passwd | while IFS=: read -r myuser pw myuid mygid gecos home shell; do
+  if [[ ${myuid} -ge 1000 ]]; then
+     getid ${myuid}
+     if [[ -n ${bigid} ]]; then
+        echo "${myuid}:${bigid}:65536" >> /etc/subuid.tmp
+     fi
+     getid ${mygid}
+     if [[ -n ${bigid} ]]; then
+       echo "${mygid}:${bigid}:65536" >> /etc/subgid.tmp
+     fi
+  fi
+done
+
+mv -f /etc/subuid /etc/subuid-
+mv -f /etc/subgid /etc/subgid-
+
+cat /etc/subuid.tmp | sort -n | uniq > /etc/subuid
+cat /etc/subgid.tmp | sort -n | uniq > /etc/subgid
+
+rm -f /etc/subuid.tmp
+rm -f /etc/subgid.tmp

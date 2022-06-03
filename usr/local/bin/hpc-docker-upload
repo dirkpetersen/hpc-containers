@@ -1,0 +1,83 @@
+#! /bin/bash
+
+ME=$(whoami)
+IMAGE=$1
+CONTID=$2
+
+if [[ -z ${IMAGE} ]]; then
+  read -p "New image name: " IMAGE
+fi
+if [[ -z ${IMAGE} ]]; then
+  echo "Image name is required as first argument"
+  echo "Container id as second argument is optional"
+  exit
+fi
+
+IMAGE="${IMAGE// /-}" # replace spaces with dash
+IMAGE="${IMAGE,,}" # force lower case
+
+# create json file with all AD attributes of the current user
+#if ! [[ -s  ~/.config/hpc-${ME}.json ]]; then
+#  echo "add code to create ~/.config/hpc-${ME}.json"
+#  exit
+#fi
+
+#nickname=$(jq -r .attributes.mailNickname[] ~/.config/hpc-${ME}.json)
+#department=$(jq -r .attributes.department[] ~/.config/hpc-${ME}.json)
+
+# department="Biostat/Bioinform Fac"  # debuging
+# If you department name is too long you can shorten it here
+#if [[ "${department}" == "Bioinformatics Core" ]]; then department="BioInf"; fi
+#if [[ "${department}" == "Scientific Computing" ]]; then department="SciComp"; fi
+
+nickname=$(git config --global user.name)
+if [[ -z ${nickname} ]]; then
+  echo "some settings are missing, please execute:"
+  echo 'git config --global user.email "you@example.com"'
+  echo 'git config --global user.name "Your Name"'
+  nickname=${ME}
+fi
+department=$(id -gn)
+
+lnickname="${nickname,,}" # force lower case
+department="${department// /-}" # replace spaces with dash
+department="${department//\//-}" # replace forward slash with dash
+ldepartment="${department,,}" # force lower case
+
+if [[ -z ${CONTID} ]]; then 
+  CONTID=$(podman ps -al --format json | jq -r .[].Id)
+fi
+if [[ -z ${CONTID} ]]; then
+  echo "Container ID to upload was empty"
+  echo "tried to execute: podman ps -al --format json"
+  echo "did you create or modify a container?"
+  exit
+fi
+SHORTCONTID=${CONTID:0:12}
+
+echo -e "\nUploading ${SHORTCONTID} to localhost:5000/${ldepartment}/${IMAGE} ...\n"
+
+podman commit --author "${nickname}" ${CONTID} ${ldepartment}/${IMAGE}
+podman tag ${ldepartment}/${IMAGE} localhost:5000/${ldepartment}/${IMAGE}
+podman push localhost:5000/${ldepartment}/${IMAGE}
+podman image rm localhost/${ldepartment}/${IMAGE}
+
+echo -e "\nexecuted these commands for you:\n"
+echo "  docker commit --author "${nickname}" ${SHORTCONTID} ${ldepartment}/${IMAGE}"
+echo "  docker tag ${ldepartment}/${IMAGE} localhost:5000/${ldepartment}/${IMAGE}"
+echo "  docker push localhost:5000/${ldepartment}/${IMAGE}"
+echo "  docker image rm localhost/${ldepartment}/${IMAGE}"
+
+echo -e "\n  Your image has been uploaded to localhost:5000 and permanent storage.\n"
+echo -e "\n  The container ${SHORTCONTID} and its image will be deleted from this machine in 7 days\n"
+
+echo -e "  To run run docker image ${IMAGE} please execute the first command" 
+echo -e "  below on this login node and the second one inside a Slurm batch script on any node.\n"
+
+echo "apptainer pull docker://localhost:5000/${ldepartment}/${IMAGE}"
+if [[ ${IMAGE} =~ ":" ]]; then
+  IMAGESIF="${IMAGE//:/_}.sif"
+else
+  IMAGESIF="${IMAGE}_latest.sif"
+fi
+echo "apptainer exec ${PWD}/${IMAGESIF} [command] [script-or-datafile]"

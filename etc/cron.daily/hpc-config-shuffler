@@ -1,0 +1,52 @@
+#! /usr/bin/python3
+
+# hpc-config-shuffler randomly changes the order of lists in configuration file entries
+# as in many configurations pointing to a list of servers only the first server is picked.
+# This allows for better load balancing of resource intensive queries (e.g. ldap) when using
+# many servers such as an HPC system
+# It runs in /etc/cron.daily and will only make changes to files modified in the last 24h
+
+import os, configparser, random, time
+
+###############################################################################################
+def main():
+    config_shuffle('/etc/sssd/sssd.conf', 'domain/default', 'ldap_uri', ',')
+
+###############################################################################################
+def grab_header(cfgfile):
+    header = ''
+    isheader = 1
+    with open(cfgfile,"r") as f:
+        for line in f:
+            if line.startswith('#'):
+                header = header+line
+            else:
+                isheader = 0
+            if not isheader:
+                return header
+    return header
+
+def config_shuffle(cfgfile, section, entry, delimiter):
+    if os.path.getmtime(cfgfile) + 86400 < time.time():
+    # file is older than 24h, ignore
+        return
+    header = grab_header(cfgfile)
+    if section != '':
+        # this is an ini-style file
+        config = configparser.ConfigParser(inline_comment_prefixes='#')
+        config.read(cfgfile)
+        mylist = config[section][entry].split(delimiter)
+        random.shuffle(mylist)
+        random.shuffle(mylist)
+        config[section][entry] = ','.join(mylist)
+        with open(cfgfile, 'w') as f:
+            config.write(f)
+        if header:
+            with open(cfgfile, 'r') as f:
+                content = f.read()
+            with open(cfgfile, 'w') as f:
+                f.write(header+'\n'+content)
+
+if __name__ == '__main__':
+    main()
+

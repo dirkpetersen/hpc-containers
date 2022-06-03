@@ -68,10 +68,10 @@ echo "  docker tag ${ldepartment}/${IMAGE} localhost:5000/${ldepartment}/${IMAGE
 echo "  docker push localhost:5000/${ldepartment}/${IMAGE}"
 echo "  docker image rm localhost/${ldepartment}/${IMAGE}"
 
-echo -e "\n  Your image has been uploaded to localhost:5000 and permanent storage.\n"
+echo -e "\n  Your image has been uploaded to permanent storage on this machine.\n"
 echo -e "\n  The container ${SHORTCONTID} and its image will be deleted from this machine in 7 days\n"
 
-echo -e "  To run run docker image ${IMAGE} please execute the first command" 
+echo -e "  To run docker image ${IMAGE} please execute the first command" 
 echo -e "  below on this login node and the second one inside a Slurm batch script on any node.\n"
 
 echo "apptainer pull docker://localhost:5000/${ldepartment}/${IMAGE}"

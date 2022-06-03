@@ -3,27 +3,26 @@
 Why you should offer both Podman (Docker) and Apptainer (Singularity) and allow users to create containers in rootless mode with user namespaces on your HPC systems. You can also jump to the [config howto directly](#configuration-of-rootless-containers). 
 If you have more questions about containers in general, check out [The Turing Way](https://the-turing-way.netlify.app/reproducible-research/renv/renv-containers.html), an excellent book about reproducible data science. 
 
-
   - [Why this article ?](#why-this-article-)
   - [A quick history of HPC containers](#a-quick-history-of-hpc-containers)
   - [Why do we need multiple container technologies ?](#why-do-we-need-multiple-container-technologies-)
     - [Why we need Docker (or Podman)?](#why-we-need-docker-or-podman)
     - [Why we need Apptainer (Singularity)](#why-we-need-apptainer-singularity)
-    - [but we don't want to confuse our users](#but-we-dont-want-to-confuse-our-users)
-    - [creating containers is harder than running them.](#creating-containers-is-harder-than-running-them)
+    - [But we don't want to confuse our users](#but-we-dont-want-to-confuse-our-users)
+    - [Creating containers is harder than running them](#creating-containers-is-harder-than-running-them)
   - [Configuration of rootless Containers](#configuration-of-rootless-containers)
-    - [user namespaces with /etc/subuid and /etc/subgid](#user-namespaces-with-etcsubuid-and-etcsubgid)
-      - [enable enumeration in SSSD](#enable-enumeration-in-sssd)
+    - [User namespaces with /etc/subuid and /etc/subgid](#user-namespaces-with-etcsubuid-and-etcsubgid)
+      - [Enable enumeration in SSSD](#enable-enumeration-in-sssd)
     - [Installing container packages](#installing-container-packages)
     - [Configuring Podman](#configuring-podman)
-    - [setup a docker registry on networked storage.](#setup-a-docker-registry-on-networked-storage)
-    - [dedicated login node with docker registry](#dedicated-login-node-with-docker-registry)
+    - [Setup a docker registry on networked storage](#setup-a-docker-registry-on-networked-storage)
+    - [Dedicated login node with docker registry](#dedicated-login-node-with-docker-registry)
       - [Creating a Registry on localhost](#creating-a-registry-on-localhost)
-      - [testing the registry](#testing-the-registry)
+      - [Testing the registry](#testing-the-registry)
     - [Summary](#summary)
   - [Appendix](#appendix)
-    - [setting up a test nfs home directory](#setting-up-a-test-nfs-home-directory)
-    - [additional links / resources](#additional-links--resources)
+    - [Setting up a test nfs home directory](#setting-up-a-test-nfs-home-directory)
+    - [Additional links / resources](#additional-links--resources)
 
 
 ## Why this article ?
@@ -56,13 +55,13 @@ Even though HPC systems are all very similar (a bunch of mostly RHEL based Linux
 
 Apptainer is a breeze to work with because your home directory, where you may have your data and code, is naturally part of the execution path: `apptainer mycontainer.sif python3 ~/myscript.py` works magically even though myscript.py is not inside the container but a file in a shared filesystem. So tens of thousands of HPC users have adopted it and would be quite befuddled if one day they had to read `singularity: command not found`. Also we have seen lots and lots of performance optimizations for Apptainer(Singularity), including GPU computing, after the HPC community has adopted it years ago. The sif container format used by Apptainer helps with reproducibility by supporting cryptographic signatures and an immutable container image format. Apptainer will be the best supported hpc container technology for years to come and is one of the few container technologies  that supports MPI jobs.
 
-### but we don't want to confuse our users 
+### But we don't want to confuse our users 
 
 "But shouldn't we recommend best practices to our users instead of throwing multiple container technologies at them?" Yes, we should indeed give recommendations. We should compare the technologies we offer and document as well as explain the pros and cons of each of them. And we should define a default, for example a quick start document should advise our users which technology we recommend for which use case and which workflow has been successful for most users. Several sites [such as ORNL](https://docs.olcf.ornl.gov/software/containers_on_summit.html) have come to the conclusion that in 2022 Podman is best for creating containers and Apptainer is best for running containers on HPC systems.
 
 However, in some cases one should NOT provide multiple technologies, for example if the functionality of two products is almost identical. One example is Gitlab vs Github in life sciences. Github is cited about [11000 times](https://pubmed.ncbi.nlm.nih.gov/?term=github) in publications while Gitlab only about [200 times](https://pubmed.ncbi.nlm.nih.gov/?term=gitlab) which is an almost 60x difference. This should trigger HPC leaders (at least the ones in life sciences) to avoid Gitlab and instead use and document Github wherever possible as Github has become a replacement even for Facebook or LinkedIn for some data scientists. Your users will be a lot less confused and perhaps even thank you if you make Github your default code management tool. As container tools and source code management are connected ,for example when using MLops pipelines you would only have to document 2 workflows instead of 4 (Podman+GitHub, Apptainer+Github, Podman+Gitlab, Apptainer+Gitlab). The Turing Way [seems to agree on Github](https://the-turing-way.netlify.app/collaboration/github-novice.html)
 
-### creating containers is harder than running them. 
+### Creating containers is harder than running them
 
 Most HPC centers only offer `runtime` support for existing containers but do not allow the creation of new containers on their systems. Users either want to execute something like docker-compose to create containers predefined in a configuration called `docker-compose.yml`. But more often than not data scientists just want to create a container by just running a few `apt install mumble-jumble` commands just as they are used to on their Ubuntu desktop or VM. Currently they have to build their containers on their desktop or a dedicated machine and then copy them over to the HPC system. While this is not too hard, this process becomes annoying when containers need to be re-created too often. 
 
@@ -70,7 +69,7 @@ Most HPC centers only offer `runtime` support for existing containers but do not
 
 Here we will discuss the implementation of rootless containers enabled by Linux user name spaces (available since Kernel 3.8) and how to interact with a local docker registry. This enables users to create and manage containers directly on an HPC login node without friction.   
 
-### user namespaces with /etc/subuid and /etc/subgid
+### User namespaces with /etc/subuid and /etc/subgid
 
 user namespaces are required for unprivileged users who would like to create or modify containers for which they must "be root" inside a container.
 As an unprivileged user per definition cannot "be root" or have sudo access on the host (outside the container), user namespaces simply map uid 0 (root) inside the container to a higher uid on the host (e.g. the compute or login node) using the config files /etc/subuid and /etc/subgid. They also add an allotted range of 65536 UIDs to the container which is required by any Unix system to function properly.
@@ -93,7 +92,7 @@ by multiplying each users' uid with 10000. We run it as an hourly cron job to re
 
 Another approach is to [pre-create subuid/subgid for all possible uids](https://rootlesscontaine.rs/getting-started/common/subuid/), however we have not tested this approach as the list is quite long. Note that you can either use the format uid:start-range:uid-count or username:start-range:uid-count. If you pre-create subuid/subgid you must use the former option as usernames will not scale. 
 
-#### enable enumeration in SSSD
+#### Enable enumeration in SSSD
 
 When using SSSD to integrate with ActiveDirectory or another LDAP service you need to set enumerate=true in section [domain/domainname] of your /etc/sssd/sssd.conf. Note that the SSSD documentation warns you against activating enumeration as it can degrade performance. We asked our ActiveDirectory team to monitor impact on the domain controllers and they did not see any performance degradation. This test was run on 70 nodes with 500 users.
 To protect against potential future performance degradation we chose to add 2 more features: 
@@ -159,13 +158,13 @@ if you have not installed the podman-docker package above, you can also setup a 
 echo "alias docker=podman" >> /etc/profile.d/zzz-hpc-users.sh
 ```
 
-### setup a docker registry on networked storage.
+### Setup a docker registry on networked storage
 
 After users created their containers on local disk they want to continue to use them on all nodes of the HPC cluster but also store it longer term in a docker registry as you will eventually have to clean out the local disk on the login node. There are public ones such as quay.io or biocontainers.org, fancy private ones such as https://goharbor.io/ or just [one with simple authentication using Podman](https://www.redhat.com/sysadmin/simple-container-registry)
 
 However, the easiest option that does not require authentication is to create a docker registry on a private/secured login node and to access it via localhost without authentication:  
 
-### dedicated login node with docker registry  
+### Dedicated login node with docker registry  
 
 Many HPC centers offer a condo model where investigators can purchase their own compute nodes which are then managed by the HPC team. If they want to purchase only a couple of nodes there is limited value in offering these resources to a larger community when the node owners are not using them. 
 The investigator may prefer to purchase a large memory login node with many CPUs and multiple GPU instead. Such a machine could be used as a beefy development or interactive compute machine with direct access to the HPC cluster and to fast storage. This login node could have several features turning it into an advanced application server:
@@ -214,7 +213,7 @@ once the script is finished you should see something like this :
    Active: active (running) since Thu 2022-06-02 23:26:23 UTC; 12ms ago
 ```
 
-#### testing the registry
+#### Testing the registry
 
 now let's pull a python container and add the notorious pandas package to it: 
 
@@ -273,7 +272,7 @@ With this setup we have achieved multiple benefits:
 
 ## Appendix
 
-### setting up a test nfs home directory
+### Setting up a test nfs home directory
 
 Use these instructions to setup a test environment NFS mounted home directry for `testuser` on the local machine 
 
@@ -290,7 +289,7 @@ setenforce 0
 useradd --home-dir /mnt/nfs-share/home/testuser testuser
 ```
 
-### additional links / resources 
+### Additional links / resources 
 
 * Podman 4 can read Apptainer sif format: https://www.redhat.com/es/blog/expanding-podman-capabilities-deploy-sif-formatted-containers
 
@@ -298,6 +297,12 @@ useradd --home-dir /mnt/nfs-share/home/testuser testuser
 
 * Docker can also run rootless now: 
 https://thenewstack.io/how-to-run-docker-in-rootless-mode/
+
+* Supercontainers, enabling containers at Exascale:  
+  http://supercontainers.org/
+
+* HPC Containers slack channel: 
+  https://hpc-containers.slack.com/
 
 * User Xattr support for NFS in Kernel 5.9 
 https://kernelnewbies.org/Linux_5.9

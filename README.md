@@ -39,9 +39,9 @@ Since then Singularity has been renamed to Apptainer and [adopted by the Linux f
 
 ## Why do we need multiple container technologies ?
 
-Many HPC centers have told their users to switch to Apptainer(Singularity) in recent years. However, HPC centers should not just see themselves as providers of fancy technology and clear guidance but also focus on supporting a diverse user population that ranges from lab scientists who just learned SSH logins yesterday to senior particle physicists who have written computer science papers on the intricacies of combining MPI with openMP. 
+Many mid-size HPC centers have told their users to switch from Docker based containers to Apptainer(Singularity) in recent years. However, HPC centers should not just see themselves as providers of fancy technology and clear guidance but also focus on supporting a diverse user population that ranges from lab scientists who just learned SSH logins yesterday to senior particle physicists who have written computer science papers on the intricacies of combining MPI with openMP. 
 
-Another dimension of this diversity is seniority. The more senior a scientist is in their field the more experimental the nature of their work will be. They may want to delegate the build of a stable and reproducible pipeline to a more junior scientist or to a research software engineer but focus on ad-hoc trying of immature pieces of code in interactive HPC sessions and testing of many different libraries and even more different versions of these. 
+Another dimension of this diversity is seniority. The more senior a scientist is in their field the more experimental the nature of their work will be. They may want to delegate the build of a stable and reproducible pipeline to a more junior scientist or to a research software engineer and focus on trying immature pieces of code in interactive HPC sessions and ad-hoc testing of many different libraries and even more different versions of these. 
 
 This is the reason why HPC sysadmins provide a plethora of software from legacy libraries to very beta applications through environment modules systems such as Lmod. These applications are typically not offered as containers which does not encourage container usage. HPC documentation focuses on running containers made at other sites but not building containers. Essentially scientists are left to build their own containers and they will need to use the tool that they find most productive to do so.
 
@@ -152,7 +152,7 @@ sed -i '/^# rootless_storage_path =.*/a rootless_storage_path = "\/loc\/tmpconta
 mkdir -p /loc/tmpcontainer && chmod 777 /loc/tmpcontainer
 ```
 
-if you have not installed the podman-docker package above, you can also setup a global alias to ensure to that all users can continue to use docker commands to run podman.
+if you have not installed the podman-docker package above, you can also setup a global alias to ensure that all users can continue to use docker commands to run podman.
 
 ```
 echo "alias docker=podman" >> /etc/profile.d/zzz-hpc-users.sh
@@ -293,10 +293,17 @@ useradd --home-dir /mnt/nfs-share/home/testuser testuser
 
 * Podman 4 can read Apptainer sif format: https://www.redhat.com/es/blog/expanding-podman-capabilities-deploy-sif-formatted-containers
 
-* podman-compose puts all containers in the same pod with a common network unlike docker-compose: https://fedoramagazine.org/manage-containers-with-podman-compose/
+* podman-compose puts all containers in the same pod with a common network unlike docker-compose: 
+  https://fedoramagazine.org/manage-containers-with-podman-compose/
 
 * Docker can also run rootless now: 
-https://thenewstack.io/how-to-run-docker-in-rootless-mode/
+  https://thenewstack.io/how-to-run-docker-in-rootless-mode/
+
+* shpc, allow loading of containers via Lmod:
+  https://github.com/singularityhub/singularity-hpc
+
+* creating Docker images from Singularity images:
+  https://github.com/singularityhub/singularity2docker
 
 * Supercontainers, enabling containers at Exascale:  
   http://supercontainers.org/

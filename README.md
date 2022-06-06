@@ -3,7 +3,6 @@
 Why you should offer both Podman (Docker) and Apptainer (Singularity) and allow users to create containers in rootless mode with user namespaces on your HPC systems. You can also jump to the [config howto directly](#configuration-of-rootless-containers). 
 If you have more questions about containers in general, check out [The Turing Way](https://the-turing-way.netlify.app/reproducible-research/renv/renv-containers.html), an excellent book about reproducible data science. 
 
-- [Containers on HPC](#containers-on-hpc)
   - [Why this article ?](#why-this-article-)
   - [A quick history of HPC containers](#a-quick-history-of-hpc-containers)
   - [Why do we need multiple container technologies ?](#why-do-we-need-multiple-container-technologies-)

@@ -315,6 +315,9 @@ useradd --home-dir /mnt/nfs-share/home/testuser testuser
 
 #### Podman
 
+* awesome terminal user interface (TUI) for Podman 4
+https://github.com/containers/podman-tui
+
 * podman-compose puts all containers in the same pod with a common network unlike docker-compose: 
   https://fedoramagazine.org/manage-containers-with-podman-compose/
 
@@ -327,7 +330,10 @@ useradd --home-dir /mnt/nfs-share/home/testuser testuser
   https://github.com/containers/skopeo
 
 * User Xattr support for NFS in Kernel 5.9 
-https://kernelnewbies.org/Linux_5.9
+  https://kernelnewbies.org/Linux_5.9
+
+* Prometheus exporter to monitor Podman with Grafana
+https://github.com/navidys/podman_exporter
 
 
 #### Apptainer / Singularity 

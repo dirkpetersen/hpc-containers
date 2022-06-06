@@ -66,7 +66,7 @@ rm -f /etc/subgid.tmp
 
 mydelay=$((RANDOM % 300))
 echo "Sleeping ${mydelay} sec ...."
-#sleep ${mydelay} # delay execution between 1 and 300 sec (5 min)
+sleep ${mydelay} # delay execution between 1 and 300 sec (5 min)
 getent passwd | while IFS=: read -r myuser pw myuid mygid gecos home shell; do
   if [[ ${myuid} -ge 1000 ]]; then
     getid ${myuid}

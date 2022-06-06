@@ -51,7 +51,7 @@ This is the reason why HPC sysadmins provide a plethora of software from legacy 
 
 Another aspect is collaboration. Most scientists are only using HPC systems for part of their work. They collaborate with scientists in other parts of the world that may not even have an HPC system available. OCI containers are a safe way to transport information as all container technologies support reading OCI container images but not all of them support writing them. HPC centers need to be aware that scientists work with a much larger technology ecosystem than their local infrastructure. 
 
-### Why we need Docker (or Podman)?
+### Why we need Docker (or Podman)
 
 Even though HPC systems are all very similar (a bunch of mostly RHEL based Linux servers glued together by Slurm, a shared Posix file system and a fast network) it is amazing how long it still takes to onboard new users into productivity even if they gained HPC experience at a previous site. With more Gen Z users we see less tolerance for things that do not work out of the box ("You are right, Gen Z") and more frequent job changes which has been further accelerated by the covid19 pandemic. In the current workplace of permanent on and off-boarding, experienced HPC users should not have to read: `docker: command not found`. Instead they should be productive with their favorite toolset as fast as possible. Sadly Apptainer(Singularity) does not support writing OCI container images and scientists will need to use Docker or Podman to share code with all possible collaborators or if they want to migrate their jobs to cloud computing engines such as AWS batch. 
 

@@ -3,6 +3,7 @@
 Why you should offer both Podman (Docker) and Apptainer (Singularity) and allow users to create containers in rootless mode with user namespaces on your HPC systems. You can also jump to the [config howto directly](#configuration-of-rootless-containers). 
 If you have more questions about containers in general, check out [The Turing Way](https://the-turing-way.netlify.app/reproducible-research/renv/renv-containers.html), an excellent book about reproducible data science. 
 
+- [Containers on HPC](#containers-on-hpc)
   - [Why this article ?](#why-this-article-)
   - [A quick history of HPC containers](#a-quick-history-of-hpc-containers)
   - [Why do we need multiple container technologies ?](#why-do-we-need-multiple-container-technologies-)
@@ -10,6 +11,7 @@ If you have more questions about containers in general, check out [The Turing Wa
     - [Why we need Apptainer (Singularity)](#why-we-need-apptainer-singularity)
     - [But we don't want to confuse our users](#but-we-dont-want-to-confuse-our-users)
     - [Creating containers is harder than running them](#creating-containers-is-harder-than-running-them)
+    - [Interoperability](#interoperability)
   - [Configuration of rootless Containers](#configuration-of-rootless-containers)
     - [User namespaces with /etc/subuid and /etc/subgid](#user-namespaces-with-etcsubuid-and-etcsubgid)
       - [Enable enumeration in SSSD](#enable-enumeration-in-sssd)
@@ -19,11 +21,14 @@ If you have more questions about containers in general, check out [The Turing Wa
     - [Dedicated login node with docker registry](#dedicated-login-node-with-docker-registry)
       - [Creating a Registry on localhost](#creating-a-registry-on-localhost)
       - [Testing the registry](#testing-the-registry)
-    - [Summary](#summary)
+  - [Summary](#summary)
   - [Appendix](#appendix)
     - [Setting up a test nfs home directory](#setting-up-a-test-nfs-home-directory)
     - [Additional links / resources](#additional-links--resources)
-
+      - [Generic](#generic)
+      - [Podman](#podman)
+      - [Apptainer / Singularity](#apptainer--singularity)
+      - [Docker](#docker)
 
 ## Why this article ?
 
@@ -49,7 +54,7 @@ Another aspect is collaboration. Most scientists are only using HPC systems for 
 
 ### Why we need Docker (or Podman)?
 
-Even though HPC systems are all very similar (a bunch of mostly RHEL based Linux servers glued together by Slurm, a shared Posix file system and a fast network) it is amazing how long it still takes to onboard new users into productivity even if they gained HPC experience at a previous site. With more Gen Z users we see less tolerance for things that do not work out of the box ("You are right, Gen Z") and more frequent job changes which has been further accelerated by the covid19 pandemic. In the current workplace of permanent on and off-boarding, experienced HPC users should not have to read: `docker: command not found`. Instead they should be productive with their favorite toolset as fast as possible. Sadly Apptainer(Singularity) does not support writing OCI container images and scientists will need to use Docker or Podman to share code with all possible collaborators.
+Even though HPC systems are all very similar (a bunch of mostly RHEL based Linux servers glued together by Slurm, a shared Posix file system and a fast network) it is amazing how long it still takes to onboard new users into productivity even if they gained HPC experience at a previous site. With more Gen Z users we see less tolerance for things that do not work out of the box ("You are right, Gen Z") and more frequent job changes which has been further accelerated by the covid19 pandemic. In the current workplace of permanent on and off-boarding, experienced HPC users should not have to read: `docker: command not found`. Instead they should be productive with their favorite toolset as fast as possible. Sadly Apptainer(Singularity) does not support writing OCI container images and scientists will need to use Docker or Podman to share code with all possible collaborators or if they want to migrate their jobs to cloud computing engines such as AWS batch. 
 
 ### Why we need Apptainer (Singularity)
 
@@ -65,9 +70,13 @@ However, in some cases one should NOT provide multiple technologies, for example
 
 Most HPC centers only offer `runtime` support for existing containers but do not allow the creation of new containers on their systems. Users either want to execute something like docker-compose to create containers predefined in a configuration called `docker-compose.yml`. But more often than not data scientists just want to create a container by just running a few `apt install mumble-jumble` commands just as they are used to on their Ubuntu desktop or VM. Currently they have to build their containers on their desktop or a dedicated machine and then copy them over to the HPC system. While this is not too hard, this process becomes annoying when containers need to be re-created too often. 
 
+### Interoperability 
+
+There are some tools such as [Skopeo](https://github.com/containers/skopeo) (>= V. 1.6) that can convert SIF to OCI, however the result is not guaranteed to run on OCI container engines as Apptainer(Singularity) handles environment variables, container startup, default namespace isolation etc. very differently than Podman and other. A direct conversion of a non-trivial Apptainer(Singularity) image is quite likely not to run as expected under an OCI engine. Podman 4 is now able to read SIF images, however it remains to be seen if this can be done reliably even with esoteric configurations. This will be too complex to handle for most end users. Just as mentioned above, the best approach to ensure global reproducibility continues to be generating an OCI container image using Podman and then share it with the the world. 
+
 ## Configuration of rootless Containers
 
-Here we will discuss the implementation of rootless containers enabled by Linux user name spaces (available since Kernel 3.8) and how to interact with a local docker registry. This enables users to create and manage containers directly on an HPC login node without friction.   
+Here we will discuss the implementation of rootless containers enabled by Linux user name spaces (available since Kernel 3.8) and how to interact with a local docker registry. This enables users to create and manage containers directly on an HPC login node without friction.  
 
 ### User namespaces with /etc/subuid and /etc/subgid
 
@@ -80,17 +89,22 @@ For example, if we have 2 users with uid 1001 and 1002 on the host we could simp
 1002:100200001:65536
 ```
 
-Inside the container we have a full uid range of 0-65535 and uid 0 inside is mapped to the actual user's uid 1001 outside the container on the host, uid 1 is mapped to 100100001 and uid 2 to 100100002.  The host sees that user 1001's containers have an assigned uid range of 100100001 to 100165536 and user 1002 has 100200001 to 100265536 to play with, which is conveniently not overlapping.
+Inside the container we have a full uid range of 0-65535 and uid 0 inside is mapped to the actual user's uid 1001 outside the container on the host, uid 1 is mapped to 100100001 and uid 2 to 100100002.  The host sees that user 1001's containers have an assigned uid range of 100100001 to 100165536 and user 1002 has 100200001 to 100265536 to play with, which is conveniently not overlapping. However, this approach scales only to uid/gid < 42000.
 
 See [this article for more details]( 
 https://opensource.com/article/19/2/how-does-rootless-podman-work)
 
-Many sites however have 5 digit UIDs and if we multiply 50000 with 100000 we have a problem because the resulting number of 5 billion is larger than the 32 bit namespace (4.2 billion) supported by Linux. Fortunately, a simple solution is to multiply the uid with only 10000 instead of 100000. Even though we only assign less than 1/6 of the full uid range this will still work as we need to provide 65536 UIDs only *inside* the container but a tiny fraction of those will actually be used on the host.    
+Many sites however have 5 digit UIDs and if we multiply 50000 with 100000 we have a problem because the resulting number of 5 billion is larger than the 32 bit namespace (4.2 billion) supported by Linux. Fortunately, a simple solution is to multiply the uid with only 10000 instead of 100000. Even though we only assign less than 1/6 of the full uid range this will still work as we need to provide 65536 UIDs only *inside* the container but a tiny fraction of those will actually be used on the host, in most cases this will be only root and nobody as rootless. 
 
-The script [/etc/cron.hourly/hpc-user-namespaces](etc/cron.hourly/hpc-user-namespaces) creates and maintains /etc/subuid and /etc/subgid
-by multiplying each users' uid with 10000. We run it as an hourly cron job to reduce confusion during new user onboarding. It executes `getent passwd` to query for UIDs which requires enumeration to be enabled in sssd.conf if you use a configuration with ActiveDirectory. 
+The script [/etc/cron.hourly/hpc-user-namespaces](etc/cron.hourly/hpc-user-namespaces) creates and maintains /etc/subuid and /etc/subgid by multiplying each users' uid and gid with 10000. We run it as an hourly cron job to reduce confusion during new user onboarding. It executes `getent passwd` to query for UIDs which requires enumeration to be enabled in sssd.conf if you use a configuration with ActiveDirectory.
 
-Another approach is to [pre-create subuid/subgid for all possible uids](https://rootlesscontaine.rs/getting-started/common/subuid/), however we have not tested this approach as the list is quite long. Note that you can either use the format uid:start-range:uid-count or username:start-range:uid-count. If you pre-create subuid/subgid you must use the former option as usernames will not scale. 
+Another approach is to [pre-create subuid/subgid for all possible uids](https://rootlesscontaine.rs/getting-started/common/subuid/), however we have not tested this approach as the list is quite long but a variation of this approach would be to take a similar logic by assigning a fixed slot of 65536 for each possible uid >=1000 but only write subuid/gid for users users who exist on the system. This scales up to uid/gid 62000 in our example and is explained in line 52 of the `hpc-user-namespaces` script.
+
+If you don't care if subuid and subgid are identical on each node you could have apptainer or another tool generate the next available range for each new user. With different caching states of ldap/AD servers the list of users may not be presented identically on each node as scripts are executed at different times (see below). You can activate the apptainer option by uncommenting lines 77-79 and commenting lines 66-75 in `hpc-user-namespaces`.
+
+Note that you can either use the format uid:start-range:uid-count or username:start-range:uid-count. If you pre-create subuid/subgid you must use the former option as usernames will not scale.
+
+Apptainer 1.1 is expected to no longer require a setup of subuid/subgid, we have not heard the same from Podman yet.
 
 #### Enable enumeration in SSSD
 
@@ -119,7 +133,7 @@ curl -L $(curl -L -s https://api.github.com/repos/docker/compose/releases/latest
 chmod +x /usr/local/bin/docker-compose
 ```
 
-install Apptainer or see [advanced install instructions for other OS](https://apptainer.org/docs/admin/main/installation.html#install-from-source)
+install Apptainer or see [advanced install instructions for other OS](https://apptainer.org/docs/admin/main/installation.html#install-from-source). Note that Apptainer is expected to be available in EPEL in 2022 which would make installing it much easier. 
 
 ```
 rpm -ivh $(curl -L -s https://api.github.com/repos/apptainer/apptainer/releases/latest | grep -o -E "https://(.*)apptainer-(.*).x86_64.rpm" | grep -v debuginfo)
@@ -259,7 +273,7 @@ apptainer exec ~/python-pandas_latest.sif python3 -c 'import pandas; print(panda
 1.4.2
 ```
 
-### Summary 
+## Summary 
 
 With this setup we have achieved multiple benefits:
 
@@ -274,7 +288,7 @@ With this setup we have achieved multiple benefits:
 
 ### Setting up a test nfs home directory
 
-Use these instructions to setup a test environment NFS mounted home directry for `testuser` on the local machine 
+Use these instructions to setup a test environment with NFS mounted home directory for `testuser` on your local machine  
 
 ```
 dnf install -y nfs-utils
@@ -291,19 +305,7 @@ useradd --home-dir /mnt/nfs-share/home/testuser testuser
 
 ### Additional links / resources 
 
-* Podman 4 can read Apptainer sif format: https://www.redhat.com/es/blog/expanding-podman-capabilities-deploy-sif-formatted-containers
-
-* podman-compose puts all containers in the same pod with a common network unlike docker-compose: 
-  https://fedoramagazine.org/manage-containers-with-podman-compose/
-
-* Docker can also run rootless now: 
-  https://thenewstack.io/how-to-run-docker-in-rootless-mode/
-
-* shpc, allow loading of containers via Lmod:
-  https://github.com/singularityhub/singularity-hpc
-
-* creating Docker images from Singularity images:
-  https://github.com/singularityhub/singularity2docker
+#### Generic
 
 * Supercontainers, enabling containers at Exascale:  
   http://supercontainers.org/
@@ -311,5 +313,35 @@ useradd --home-dir /mnt/nfs-share/home/testuser testuser
 * HPC Containers slack channel: 
   https://hpc-containers.slack.com/
 
+
+#### Podman
+
+* podman-compose puts all containers in the same pod with a common network unlike docker-compose: 
+  https://fedoramagazine.org/manage-containers-with-podman-compose/
+
+* Podman 4 can read Apptainer sif format: https://www.redhat.com/es/blog/expanding-podman-capabilities-deploy-sif-formatted-containers
+
+* building OCI containers from bash scripts if you don't like Dockerfile
+  https://github.com/containers/buildah
+
+* converting SIF to OCI and advanced management of image registries 
+  https://github.com/containers/skopeo
+
 * User Xattr support for NFS in Kernel 5.9 
 https://kernelnewbies.org/Linux_5.9
+
+
+#### Apptainer / Singularity 
+
+* shpc, allow loading of containers via Lmod:
+  https://github.com/singularityhub/singularity-hpc
+
+* creating Docker images from Singularity images:
+  https://github.com/singularityhub/singularity2docker
+
+
+#### Docker
+
+* Docker can also run rootless now: 
+  https://thenewstack.io/how-to-run-docker-in-rootless-mode/
+

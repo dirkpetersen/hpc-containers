@@ -11,11 +11,19 @@
 # any unix system to function properly. See this article for more details: 
 # https://opensource.com/article/19/2/how-does-rootless-podman-work
 # This script creates and maintains /etc/subuid and /etc/subgid for container 
-# name spaces.
+# name spaces that ensure idempotency (no matter how often it is executed it
+# should always have the same result)
 # Note that we simply multiply each users' uid with 10000 to create the uid
-# of the root user inside the container. This will inevitably create 
-# overlapping uid ranges if 2 users were to use the same host. This is not a 
-# problem however as applications rarely require the use of uids > 1000.
+# of the root user inside the container. This will inevitably create
+# overlapping uid ranges if 2 users were to use the same host. This is a minor
+# security risk as owwnship for files on the local system (e.g.in /tmp) created
+# by non-root users in containers executed in rootless mode would see/overwrite
+# each others files. Below are 3 different ways to generate a subuid/gid 
+# starting range, please see bigid variables in function getid. A 4th option 
+# is to use apptainer and you can activate this by uncommenting lines 77-79 
+# and commenting lines 66-75. If using apptainer you may consider to only 
+# execute it on a single machine and then copy /etc/subuid and /etc/subgid 
+# to all your other nodes to ensure that they are identical across all nodes.
 #   
 # If you are using SSSD to integrate with ActiveDirectory you need to set 
 # enumerate=true in section [domain/<domainname>] of your /etc/sssd/sssd.conf.
@@ -33,12 +41,22 @@
 # If you are still concerned about too many servers executing this script you
 # could simply execute this script on a couple of machines and then copy 
 # /etc/subuid and /etc/subgid them to all your other nodes.
-# 
 
 getid(){
-  bigid=$(($1*10000))
+  ### choose from multiple options to generate consistent subuid/gid 
+  # supports uid/gid < 420000 but potential security issues 
+  bigid=$(($1*10000+1))
+  ## supports uid/gid < 42000
+  #bigid=$(($1*100000+1)) 
+  ## supports uid/gid < 62000 / count down from 4BN, less than max of 32bit range
+  ## assign a fixed range of 65536 to each user with uid >= 1000
+  #bigid=$((4000000000-(($1-999)*65536)))
   if [[ ${bigid} -gt 4294967296 ]]; then
-    logger "${bigid} (${myuser}) is larger than the 32bit UID range..ignoring"
+    logger -s "subuid/gid ${bigid} (${myuser}) is larger than the 32bit UID range..ignoring"
+    bigid='' 
+  fi
+  if [[ ${bigid} -le 0 ]]; then
+    logger -s "ignoring subuid/gid generation for uid/gid < 1000 (${myuser})"
     bigid='' 
   fi
 }
@@ -46,18 +64,23 @@ getid(){
 rm -f /etc/subuid.tmp
 rm -f /etc/subgid.tmp
 
-sleep $((RANDOM % 300))     # delay execution between 1 and 300 sec (5 min)
+sleep $((RANDOM % 300))  # delay execution between 1 and 300 sec (5 min)
 getent passwd | while IFS=: read -r myuser pw myuid mygid gecos home shell; do
   if [[ ${myuid} -ge 1000 ]]; then
-     getid ${myuid}
-     if [[ -n ${bigid} ]]; then
-        echo "${myuid}:${bigid}:65536" >> /etc/subuid.tmp
-     fi
-     getid ${mygid}
-     if [[ -n ${bigid} ]]; then
-       echo "${mygid}:${bigid}:65536" >> /etc/subgid.tmp
-     fi
+    getid ${myuid}
+    if [[ -n ${bigid} ]]; then
+      echo "${myuid}:${bigid}:65536" >> /etc/subuid.tmp
+    fi
+    getid ${mygid}
+    if [[ -n ${bigid} ]]; then
+      echo "${mygid}:${bigid}:65536" >> /etc/subgid.tmp
+    fi
   fi
+  ## apptainer can also generate subuid/gid, 
+  ## perhaps not consistently across cluster
+  #if [[ ${myuid} -ge 1000 ]]; then
+  #  apptainer config fakeroot --add ${myuser}
+  #fi 
 done
 
 mv -f /etc/subuid /etc/subuid-

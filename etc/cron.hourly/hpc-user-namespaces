@@ -20,8 +20,8 @@
 # by non-root users in containers executed in rootless mode would see/overwrite
 # each others files. Below are 3 different ways to generate a subuid/gid 
 # starting range, please see bigid variables in function getid. A 4th option 
-# is to use apptainer and you can activate this by uncommenting lines 77-79 
-# and commenting lines 66-75. If using apptainer you may consider to only 
+# is to use apptainer and you can activate this by uncommenting lines 83-86 
+# and commenting lines 71-80. If using apptainer you may consider to only 
 # execute it on a single machine and then copy /etc/subuid and /etc/subgid 
 # to all your other nodes to ensure that they are identical across all nodes.
 #   

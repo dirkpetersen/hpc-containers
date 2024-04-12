@@ -336,7 +336,7 @@ https://github.com/containers/podman-tui
   https://kernelnewbies.org/Linux_5.9
 
 * Prometheus exporter to monitor Podman with Grafana
-https://github.com/navidys/podman_exporter
+  https://github.com/containers/prometheus-podman-exporter
 
 
 #### Apptainer / Singularity 
